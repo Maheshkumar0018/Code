@@ -1,0 +1,1 @@
+The background FN is 0.06, suggesting a relatively low rate of missed detections for the "Human" class. This could be due to the model sometimes failing to detect humans that are present in the image, but this failure is not reflected in the confusion matrix entries for "Human" and "Non-Human.
