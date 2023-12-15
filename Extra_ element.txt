@@ -1,0 +1,32 @@
+def draw_boxes(predictions: np.ndarray, input_shape: Tuple[int], image: np.ndarray, names: List[str], colors: Dict[str, int]):
+    """
+    Utility function for drawing predicted bounding boxes on image
+    Parameters:
+        predictions (np.ndarray): list of detections with (n,7) or (n,6) shape, where n - number of detected boxes in format [0, x1, y1, x2, y2, score, label]
+        image (np.ndarray): image for boxes visualization
+        names (List[str]): list of names for each class in dataset
+        colors (Dict[str, int]): mapping between class name and drawing color
+    Returns:
+        image (np.ndarray): box visualization result
+    """
+    if not len(predictions):
+        return image
+
+    # Check the length of the first prediction to determine the structure
+    if len(predictions[0]) == 7:
+        # Rescale boxes from input size to original image size
+        predictions[:, 1:5] = scale_coords(input_shape[2:], predictions[:, 1:5], image.shape).round()
+
+        # Write results for predictions with size 7
+        for pred in predictions:
+            *xyxy, conf, cls = pred[1:]  # Skip the first element
+            label = f'{names[int(cls)]} {conf:.2f}'
+            plot_one_box(xyxy, image, label=label, color=colors[names[int(cls)]], line_thickness=1)
+    elif len(predictions[0]) == 6:
+        # Write results for predictions with size 6
+        for pred in predictions:
+            xyxy, conf, cls = pred
+            label = f'{names[int(cls)]} {conf:.2f}'
+            plot_one_box(xyxy, image, label=label, color=colors[names[int(cls)]], line_thickness=1)
+
+    return image
