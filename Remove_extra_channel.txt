@@ -1,0 +1,3 @@
+img = letterbox(img0, auto=False)[0][:, :, :3]
+
+
