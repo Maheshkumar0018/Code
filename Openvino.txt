@@ -1,0 +1,63 @@
+import cv2
+from openvino.inference_engine import IECore
+
+def load_model(model_xml, model_bin):
+    ie = IECore()
+    net = ie.read_network(model=model_xml, weights=model_bin)
+    exec_net = ie.load_network(network=net, device_name='CPU', num_requests=1)
+    input_blob = next(iter(net.inputs))
+    return exec_net, input_blob
+
+def preprocess_input(image, input_shape):
+    resized_image = cv2.resize(image, (input_shape[3], input_shape[2]))
+    transposed_image = resized_image.transpose((2, 0, 1))
+    input_image = transposed_image.reshape(1, *transposed_image.shape)
+    return input_image
+
+def postprocess_output(output, threshold):
+    # Implement post-processing based on the model's output format
+    # This will depend on the specific object detection model you're using
+    # Adjust this function according to the model's documentation
+
+    # Example:
+    detections = []
+    for obj in output['detection']:
+        if obj['confidence'] > threshold:
+            box = obj['location']
+            detections.append(box)
+    return detections
+
+def display_results(image, detections):
+    # Implement drawing bounding boxes on the image
+    for box in detections:
+        cv2.rectangle(image, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0), 2)
+    cv2.imshow('Object Detection', image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+def main():
+    model_xml = 'path/to/your/model.xml'
+    model_bin = 'path/to/your/model.bin'
+    image_path = 'path/to/your/input/image.jpg'
+    confidence_threshold = 0.5  # Adjust as needed
+
+    # Load the model
+    exec_net, input_blob = load_model(model_xml, model_bin)
+
+    # Read and preprocess the input image
+    input_image = cv2.imread(image_path)
+    input_shape = exec_net.input_info[input_blob].input_data.shape
+    preprocessed_image = preprocess_input(input_image, input_shape)
+
+    # Run inference
+    result = exec_net.infer(inputs={input_blob: preprocessed_image})
+
+    # Post-process the output
+    detections = postprocess_output(result, confidence_threshold)
+
+    # Display results
+    display_results(input_image, detections)
+
+if __name__ == '__main__':
+    main()
+￼Enter
