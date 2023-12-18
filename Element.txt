@@ -1,0 +1,1 @@
+predictions = torch.unsqueeze(torch.from_numpy(model(input_tensor)[output_blob]), 0)
