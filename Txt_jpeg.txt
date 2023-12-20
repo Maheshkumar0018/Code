@@ -1,0 +1,19 @@
+import cv2
+import imageio
+
+def save_as_jpeg2000(image_path, output_path):
+    # Read the image using OpenCV
+    image = cv2.imread(image_path)
+
+    # Convert the image to RGB (imageio expects RGB format)
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    # Save the image in JPEG 2000 format using imageio
+    imageio.imwrite(output_path, image_rgb, format='jp2')
+
+if __name__ == '__main__':
+    input_image_path = 'path/to/your/input/image.jpg'
+    output_image_path = 'path/to/your/output/image.jp2'
+
+    save_as_jpeg2000(input_image_path, output_image_path)
+￼Enter
