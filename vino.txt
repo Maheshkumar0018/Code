@@ -1,0 +1,52 @@
+import numpy as np
+from PIL import Image
+import openvino as ov
+from utils.general import non_max_suppression, scale_coords
+from utils.datasets import letterbox
+from utils.plots import plot_one_box
+
+# Assuming these are defined elsewhere in your code
+DEFAULT_NAMES = [...]
+COLORS = {...}
+
+def preprocess_image_for_yolov7(img0: np.ndarray):
+    img, *_ = letterbox(img0, new_shape=640)  # Assuming input shape for YOLOv7 is 640x640
+    img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, HWC to CHW
+    img = np.ascontiguousarray(img)
+    img = img.astype(np.float32) / 255.0  # Normalize to [0, 1]
+    return img, img0
+
+def detect_yolov7(model: ov.Model, image_path, conf_thres: float = 0.25, iou_thres: float = 0.45):
+    img = np.array(Image.open(image_path))
+    input_tensor, orig_img = preprocess_image_for_yolov7(img)
+    output_blob = model.output_names[0]  # Assuming YOLOv7 has only one output blob
+    predictions = model.infer(inputs={model.input_names[0]: input_tensor})
+    pred = non_max_suppression(predictions[output_blob], conf_thres, iou_thres)
+    return pred, orig_img, input_tensor.shape
+
+def draw_boxes(predictions: np.ndarray, input_shape: tuple, image: np.ndarray, names: list, colors: dict):
+    if not len(predictions):
+        return image
+    predictions[:, :4] = scale_coords(input_shape[2:], predictions[:, :4], image.shape).round()
+
+    for *xyxy, conf, cls in reversed(predictions):
+        label = f'{names[int(cls)]} {conf:.2f}'
+        plot_one_box(xyxy, image, label=label, color=colors[names[int(cls)]], line_thickness=1)
+    return image
+
+# Assuming the OpenVINO Core is already initialized and 'model_path' points to the converted YOLOv7 model XML file
+core = ov.Core()
+model = core.read_model('model_path.xml')
+compiled_model = core.compile_model(model, 'CPU')  # Adjust the device as needed
+
+# Replace 'image_path' with the path to your test image
+boxes, image, input_shape = detect_yolov7(compiled_model, 'image_path.jpg')
+image_with_boxes = draw_boxes(boxes[0], input_shape, image, DEFAULT_NAMES, COLORS)
+
+# Convert the image with drawn boxes to PIL format
+output_image = Image.fromarray(image_with_boxes)
+
+# Save the image to a file
+output_image.save('result_image.jpg')
+
+print("Inference completed.")
