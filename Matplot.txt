@@ -162,3 +162,20 @@ for i, obj in enumerate(objects):
 plt.tight_layout()
 plt.show()
 
+
+
+bar_width = 0.05
+
+# Grouped Bar Plot
+fig, ax = plt.subplots(figsize=(12, 6))
+for class_num, obj in enumerate(objects):
+    x = np.arange(len(df['Sparsity'])) + bar_width * class_num
+    ax.bar(x, df[f'MAP@50_{obj}'], width=bar_width, label=f'MAP@50_{obj}')
+    ax.bar(x + bar_width, df[f'MAP@95_{obj}'], width=bar_width, label=f'MAP@95_{obj}')
+ax.set_xlabel('Sparsity Level')
+ax.set_ylabel('MAP Scores')
+ax.set_title('Grouped Bar Plot')
+ax.set_xticks(np.arange(len(df['Sparsity'])) + bar_width * 4)
+ax.set_xticklabels(df['Sparsity'])
+ax.legend()
+plt.show()
