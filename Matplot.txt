@@ -34,3 +34,77 @@ plt.legend()
 # Show the plot
 plt.grid(True)
 plt.show()
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Sample data (replace this with your actual data)
+data = {
+    'Sparsity': [0.1, 0.2, 0.3],
+    'MAP@50_all': [0.8, 0.7, 0.6],
+    'MAP@95_all': [0.9, 0.85, 0.75],
+    'MAP@50_other': [0.7, 0.65, 0.55],
+    'MAP@95_other': [0.85, 0.8, 0.7],
+    'MAP@50_another': [0.6, 0.55, 0.45],
+    'MAP@95_another': [0.75, 0.7, 0.6],
+}
+
+df = pd.DataFrame(data)
+
+# Line Plot
+plt.figure(figsize=(12, 8))
+objects = ['all', 'other', 'another']
+
+for obj in objects:
+    plt.plot(df['Sparsity'], df[f'MAP@50_{obj}'], marker='o', label=f'{obj.capitalize()} - MAP@50')
+    plt.plot(df['Sparsity'], df[f'MAP@95_{obj}'], marker='o', label=f'{obj.capitalize()} - MAP@95')
+
+plt.xlabel('Sparsity Level')
+plt.ylabel('MAP Scores')
+plt.title('Line Plot of MAP Scores at Different Sparsity Levels for Each Object')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Subplots
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 8))
+
+for i, ax in enumerate(axes.flatten()):
+    obj = objects[i]
+    ax.plot(df['Sparsity'], df[f'MAP@50_{obj}'], marker='o', label=f'{obj.capitalize()} - MAP@50')
+    ax.plot(df['Sparsity'], df[f'MAP@95_{obj}'], marker='o', label=f'{obj.capitalize()} - MAP@95')
+    ax.set_xlabel('Sparsity Level')
+    ax.set_ylabel('MAP Scores')
+    ax.set_title(f'Subplot - {obj.capitalize()}')
+    ax.legend()
+    ax.grid(True)
+
+plt.tight_layout()
+plt.show()
+
+# Heat Map
+plt.figure(figsize=(12, 8))
+heatmap_data = df.set_index('Sparsity').T
+plt.imshow(heatmap_data, cmap='viridis', interpolation='nearest')
+plt.colorbar()
+plt.xticks(np.arange(len(df['Sparsity'])), df['Sparsity'])
+plt.yticks(np.arange(len(df.columns[1:])), df.columns[1:], rotation=0)
+plt.xlabel('Sparsity Level')
+plt.ylabel('Object')
+plt.title('Heat Map of MAP Scores at Different Sparsity Levels for Each Object')
+plt.show()
+
+# Bar Plot
+plt.figure(figsize=(12, 8))
+for obj in objects:
+    plt.bar(df['Sparsity'], df[f'MAP@50_{obj}'], label=f'{obj.capitalize()} - MAP@50')
+    plt.bar(df['Sparsity'], df[f'MAP@95_{obj}'], label=f'{obj.capitalize()} - MAP@95')
+
+plt.xlabel('Sparsity Level')
+plt.ylabel('MAP Scores')
+plt.title('Bar Plot of MAP Scores at Different Sparsity Levels for Each Object')
+plt.legend()
+plt.grid(True)
+plt.show()
