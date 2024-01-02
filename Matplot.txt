@@ -179,3 +179,111 @@ ax.set_xticks(np.arange(len(df['Sparsity'])) + bar_width * 4)
 ax.set_xticklabels(df['Sparsity'])
 ax.legend()
 plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Sample data
+data = {
+    'Sparsity': [0.1, 0.2, 0.3],
+    'MAP@50_all': [0.8, 0.7, 0.6],
+    'MAP@95_all': [0.9, 0.85, 0.75],
+    'MAP@50_other': [0.7, 0.65, 0.55],
+    'MAP@95_other': [0.85, 0.8, 0.7],
+    'MAP@50_another': [0.6, 0.55, 0.45],
+    'MAP@95_another': [0.75, 0.7, 0.6],
+    'MAP@50_an': [0.6, 0.55, 0.45],
+    'MAP@95_an': [0.75, 0.7, 0.6],
+    'MAP@50_w': [0.6, 0.55, 0.45],
+    'MAP@95_w': [0.75, 0.7, 0.6],
+    'MAP@50_k': [0.6, 0.55, 0.45],
+    'MAP@95_k': [0.75, 0.7, 0.6],
+    'MAP@50_m': [0.6, 0.55, 0.45],
+    'MAP@95_m': [0.75, 0.7, 0.6],
+    'MAP@50_8': [0.6, 0.55, 0.45],
+    'MAP@95_8': [0.75, 0.7, 0.6],
+    'MAP@50_9': [0.6, 0.55, 0.45],
+    'MAP@95_9': [0.75, 0.7, 0.6],
+    'MAP@50_10': [0.6, 0.55, 0.45],
+    'MAP@95_10': [0.75, 0.7, 0.6],
+    'MAP@50_11': [0.6, 0.55, 0.45],
+    'MAP@95_11': [0.75, 0.7, 0.6],
+    
+    'MAP@50_all_original': [0.8, np.nan, np.nan],
+    'MAP@95_all_original': [0.9, np.nan, np.nan],
+    'MAP@50_other_original': [0.7, np.nan, np.nan],
+    'MAP@95_other_original': [0.85, np.nan, np.nan],
+    'MAP@50_another_original': [0.6, np.nan, np.nan],
+    'MAP@95_another_original': [0.75, np.nan, np.nan],
+    'MAP@50_an_original': [0.6, np.nan, np.nan],
+    'MAP@95_an_original': [0.75, np.nan, np.nan],
+    'MAP@50_w_original': [0.6, np.nan, np.nan],
+    'MAP@95_w_original': [0.75, np.nan, np.nan],
+    'MAP@50_k_original': [0.6, np.nan, np.nan],
+    'MAP@95_k_original': [0.75, np.nan, np.nan],
+    'MAP@50_m_original': [0.69, np.nan, np.nan],
+    'MAP@95_m_original': [0.75, np.nan, np.nan],
+    'MAP@50_8_original': [0.69, np.nan, np.nan],
+    'MAP@95_8_original': [0.75, np.nan, np.nan],
+    'MAP@50_9_original': [0.6, np.nan, np.nan],
+    'MAP@95_9_original': [0.75, np.nan, np.nan],
+    'MAP@50_10_original': [0.6, np.nan, np.nan],
+    'MAP@95_10_original': [0.75, np.nan, np.nan],
+    'MAP@50_11_original': [0.65, np.nan, np.nan],
+    'MAP@95_11_original': [0.75, np.nan, np.nan],
+}
+
+df = pd.DataFrame(data)
+
+# Extract objects from column names
+objects = sorted(list(set(col.split('_')[1] for col in df.columns if '_' in col)))
+
+# Calculate the number of rows and columns for subplots
+num_objects = len(objects)
+num_rows = num_objects // 2 + num_objects % 2
+num_cols = 2
+
+# Create subplots with multiple line plots
+fig, axes = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(12, 8))
+
+for i, obj in enumerate(objects):
+    row_index = i // num_cols
+    col_index = i % num_cols
+    
+    # Plot Sparsity values
+    axes[row_index, col_index].plot(df['Sparsity'], df[f'MAP@50_{obj}'], marker='o', label=f'MAP@50 - {obj}')
+    axes[row_index, col_index].plot(df['Sparsity'], df[f'MAP@95_{obj}'], marker='o', label=f'MAP@95 - {obj}')
+
+    # Plot Original values
+    original_mask = ~np.isnan(df[f'MAP@50_{obj}_original'])
+    axes[row_index, col_index].plot(df['Sparsity'][original_mask], df[f'MAP@50_{obj}_original'][original_mask],
+                                     marker='*', linestyle='', label=f'MAP@50_original - {obj}', color='green')
+    
+    axes[row_index, col_index].plot(df['Sparsity'][original_mask], df[f'MAP@95_{obj}_original'][original_mask],
+                                     marker='*', linestyle='', label=f'MAP@95_original - {obj}', color='green')
+
+    
+   # Add x-axis and y-axis labels
+#     axes[row_index, col_index].set_xlabel('Sparsity Level')
+#     axes[row_index, col_index].set_ylabel('MAP Scores')
+#     axes[row_index, col_index].set_title(f'{obj.capitalize()}')
+#     #axes[row_index, col_index].legend()
+# Adjust layout
+plt.tight_layout()
+plt.show()
