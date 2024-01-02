@@ -114,7 +114,6 @@ plt.show()
 //////////////////
 import pandas as pd
 import matplotlib.pyplot as plt
-import math
 
 # Sample data
 data = {
@@ -146,28 +145,20 @@ data = {
 df = pd.DataFrame(data)
 
 # Extract objects from column names
-objects = [col.split('_')[1] for col in df.columns if '_' in col]
+objects = sorted(list(set(col.split('_')[1] for col in df.columns if '_' in col)))
 
-# Calculate the number of rows and columns for subplots
-num_objects = len(objects)
-num_rows = math.ceil(num_objects / 3)
-num_cols = min(num_objects, 3)
-
-# Create subplots
-fig, axes = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(15, 4 * num_rows))
+# Create subplots with multiple line plots
+fig, axs = plt.subplots(4, 3, figsize=(15, 15))
+axs = axs.flatten()
 
 for i, obj in enumerate(objects):
-    row_index = i // num_cols
-    col_index = i % num_cols
-    
-    axes[row_index, col_index].plot(df['Sparsity'], df[f'MAP@50_{obj}'], marker='o', label=f'{obj.capitalize()} - MAP@50')
-    axes[row_index, col_index].plot(df['Sparsity'], df[f'MAP@95_{obj}'], marker='o', label=f'{obj.capitalize()} - MAP@95')
-    axes[row_index, col_index].set_xlabel('Sparsity Level')
-    axes[row_index, col_index].set_ylabel('MAP Scores')
-    axes[row_index, col_index].set_title(f'{obj.capitalize()}')
-    axes[row_index, col_index].legend()
-    axes[row_index, col_index].grid(True)
+    axs[i].plot(df['Sparsity'], df[f'MAP@50_{obj}'], marker='o', label=f'MAP@50')
+    axs[i].plot(df['Sparsity'], df[f'MAP@95_{obj}'], marker='o', label=f'MAP@95')
+    axs[i].set_title(f'{obj.capitalize()}')
+    axs[i].set_xlabel('Sparsity Level')
+    axs[i].set_ylabel('MAP Scores')
+    axs[i].legend()
 
-# Adjust layout
 plt.tight_layout()
 plt.show()
+
