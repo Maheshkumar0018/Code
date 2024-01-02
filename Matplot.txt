@@ -108,3 +108,66 @@ plt.title('Bar Plot of MAP Scores at Different Sparsity Levels for Each Object')
 plt.legend()
 plt.grid(True)
 plt.show()
+
+
+
+//////////////////
+import pandas as pd
+import matplotlib.pyplot as plt
+import math
+
+# Sample data
+data = {
+    'Sparsity': [0.1, 0.2, 0.3],
+    'MAP@50_all': [0.8, 0.7, 0.6],
+    'MAP@95_all': [0.9, 0.85, 0.75],
+    'MAP@50_other': [0.7, 0.65, 0.55],
+    'MAP@95_other': [0.85, 0.8, 0.7],
+    'MAP@50_another': [0.6, 0.55, 0.45],
+    'MAP@95_another': [0.75, 0.7, 0.6],
+    'MAP@50_an': [0.6, 0.55, 0.45],
+    'MAP@95_an': [0.75, 0.7, 0.6],
+    'MAP@50_w': [0.6, 0.55, 0.45],
+    'MAP@95_w': [0.75, 0.7, 0.6],
+    'MAP@50_k': [0.6, 0.55, 0.45],
+    'MAP@95_k': [0.75, 0.7, 0.6],
+    'MAP@50_m': [0.6, 0.55, 0.45],
+    'MAP@95_m': [0.75, 0.7, 0.6],
+    'MAP@50_8': [0.6, 0.55, 0.45],
+    'MAP@95_8': [0.75, 0.7, 0.6],
+    'MAP@50_9': [0.6, 0.55, 0.45],
+    'MAP@95_9': [0.75, 0.7, 0.6],
+    'MAP@50_10': [0.6, 0.55, 0.45],
+    'MAP@95_10': [0.75, 0.7, 0.6],
+    'MAP@50_11': [0.6, 0.55, 0.45],
+    'MAP@95_11': [0.75, 0.7, 0.6],
+}
+
+df = pd.DataFrame(data)
+
+# Extract objects from column names
+objects = [col.split('_')[1] for col in df.columns if '_' in col]
+
+# Calculate the number of rows and columns for subplots
+num_objects = len(objects)
+num_rows = math.ceil(num_objects / 3)
+num_cols = min(num_objects, 3)
+
+# Create subplots
+fig, axes = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(15, 4 * num_rows))
+
+for i, obj in enumerate(objects):
+    row_index = i // num_cols
+    col_index = i % num_cols
+    
+    axes[row_index, col_index].plot(df['Sparsity'], df[f'MAP@50_{obj}'], marker='o', label=f'{obj.capitalize()} - MAP@50')
+    axes[row_index, col_index].plot(df['Sparsity'], df[f'MAP@95_{obj}'], marker='o', label=f'{obj.capitalize()} - MAP@95')
+    axes[row_index, col_index].set_xlabel('Sparsity Level')
+    axes[row_index, col_index].set_ylabel('MAP Scores')
+    axes[row_index, col_index].set_title(f'{obj.capitalize()}')
+    axes[row_index, col_index].legend()
+    axes[row_index, col_index].grid(True)
+
+# Adjust layout
+plt.tight_layout()
+plt.show()
