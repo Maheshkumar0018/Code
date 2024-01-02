@@ -1,0 +1,36 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Sample data (replace this with your actual data)
+data = {
+    'Sparsity': [0.1, 0.2, 0.3],
+    'MAP@50_Class1': [0.8, 0.7, 0.6],
+    'MAP@95_Class1': [0.9, 0.85, 0.75],
+    'MAP@50_Class2': [0.7, 0.65, 0.55],
+    'MAP@95_Class2': [0.85, 0.8, 0.7],
+    'MAP@50_Class3': [0.6, 0.55, 0.45],
+    'MAP@95_Class3': [0.75, 0.7, 0.6],
+}
+
+df = pd.DataFrame(data)
+
+# Plotting
+plt.figure(figsize=(10, 6))
+
+# Plot MAP@50 for each class
+for class_num in range(1, 4):
+    plt.plot(df['Sparsity'], df[f'MAP@50_Class{class_num}'], marker='o', label=f'Class {class_num} - MAP@50')
+
+# Plot MAP@95 for each class
+for class_num in range(1, 4):
+    plt.plot(df['Sparsity'], df[f'MAP@95_Class{class_num}'], marker='o', label=f'Class {class_num} - MAP@95')
+
+# Add labels and title
+plt.xlabel('Sparsity Level')
+plt.ylabel('MAP Scores')
+plt.title('MAP Scores at Different Sparsity Levels for Each Class')
+plt.legend()
+
+# Show the plot
+plt.grid(True)
+plt.show()
