@@ -21,4 +21,4 @@ train_yolov7(workers=8, device='cpu', batch_size=2, data='data/custom.yaml',
               img_size=640, cfg='cfg/training/yolov7.yaml', weights='./yolov7.pt', name='yolov7', 
               hyp='data/hyp.scratch.p5.yaml')
 
-
+https://stackoverflow.com/questions/76541998/using-a-python-function-how-can-i-trigger-the-training-function-in-train-py
