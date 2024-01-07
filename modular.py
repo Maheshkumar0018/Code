@@ -97,11 +97,14 @@ def train_yolov7(workers, device, batch_size, data, img_size, cfg, weights, name
     # Run the YOLOv7 training script
     subprocess.run(cmd)
 
-    # Return the updated path in case it's needed
+    # Return the path where the results are saved
     result_path = f'runs/train/{folder_name}'
     print(f'Training results saved in: {result_path}')
     return result_path
 
 # Example usage
-result_path = train_yolov7(workers=8, device=0, batch_size=32, data='data/coco.yaml', img_size=640, cfg='cfg/training/yolov7.yaml', weights='', name='yolo', hyp='data/hyp.scratch.p5.yaml')
-result_path = train_yolov7(workers=8, device=0, batch_size=32, data='data/coco.yaml', img_size=640, cfg='cfg/training/yolov7.yaml', weights='', name='yolo', hyp='data/hyp.scratch.p5.yaml')
+result_path_1 = train_yolov7(workers=8, device=0, batch_size=32, data='data/coco.yaml', img_size=640, cfg='cfg/training/yolov7.yaml', weights='', name='yolo', hyp='data/hyp.scratch.p5.yaml')
+result_path_2 = train_yolov7(workers=8, device=0, batch_size=32, data='data/coco.yaml', img_size=640, cfg='cfg/training/yolov7.yaml', weights='', name='yolo', hyp='data/hyp.scratch.p5.yaml')
+
+print(f'Results for the first run are saved in: {result_path_1}')
+print(f'Results for the second run are saved in: {result_path_2}')
