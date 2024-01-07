@@ -58,3 +58,50 @@ else:
     print("Training failed.")
 
 
+--------------------------------------------------------------------------------------------
+import os
+import subprocess
+
+def train_yolov7(workers, device, batch_size, data, img_size, cfg, weights, name, hyp):
+    base_folder = name
+
+    # Check if the base folder already exists
+    if os.path.exists(f'runs/train/{base_folder}'):
+        # Find the latest existing folder with the base name and increment the index
+        index = 1
+        while os.path.exists(f'runs/train/{base_folder}{index}'):
+            index += 1
+
+        # Create the new folder
+        folder_name = f'{base_folder}{index}'
+        os.makedirs(f'runs/train/{folder_name}')
+    else:
+        # Create the base folder if it doesn't exist
+        folder_name = base_folder
+        os.makedirs(f'runs/train/{folder_name}')
+
+    # Construct the command for training
+    cmd = [
+        'python', 'train.py',
+        '--workers', str(workers),
+        '--device', str(device),
+        '--batch-size', str(batch_size),
+        '--data', data,
+        '--img', str(img_size), str(img_size),
+        '--cfg', cfg,
+        '--weights', weights,
+        '--name', folder_name,  # Use the folder name as the output name
+        '--hyp', hyp
+    ]
+
+    # Run the YOLOv7 training script
+    subprocess.run(cmd)
+
+    # Return the updated path in case it's needed
+    result_path = f'runs/train/{folder_name}'
+    print(f'Training results saved in: {result_path}')
+    return result_path
+
+# Example usage
+result_path = train_yolov7(workers=8, device=0, batch_size=32, data='data/coco.yaml', img_size=640, cfg='cfg/training/yolov7.yaml', weights='', name='yolo', hyp='data/hyp.scratch.p5.yaml')
+result_path = train_yolov7(workers=8, device=0, batch_size=32, data='data/coco.yaml', img_size=640, cfg='cfg/training/yolov7.yaml', weights='', name='yolo', hyp='data/hyp.scratch.p5.yaml')
