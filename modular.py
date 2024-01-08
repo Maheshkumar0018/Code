@@ -134,3 +134,15 @@ def export_yolov7(device, weights, img_size, output_folder, include=['coreml', '
 
 # Example usage
 export_yolov7(device='cpu', weights='./yolov7.pt', img_size=640, output_folder='./exported_models', include=['onnx'])
+
+
+
+
+
+
+model_path = "runs/train/folder/weights/best.pt"
+
+# Remove "best.pt" from the end of the path
+model_path_without_best_pt = model_path.rsplit('/', 1)[0]
+
+print(model_path_without_best_pt)
