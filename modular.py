@@ -108,3 +108,29 @@ result_path_2 = train_yolov7(workers=8, device=0, batch_size=32, data='data/coco
 
 print(f'Results for the first run are saved in: {result_path_1}')
 print(f'Results for the second run are saved in: {result_path_2}')
+_-----------------------
+
+import subprocess
+
+def export_yolov7(device, weights, img_size, output_folder, include=['coreml', 'onnx', 'torchscript']):
+    cmd = [
+        'python', 'export.py',
+        '--device', str(device),
+        '--weights', weights,
+        '--img-size', str(img_size),
+        '--include', ','.join(include),
+        '--dynamic',  # Add this if you want dynamic ONNX shape
+        '--dynamic-export',  # Add this if you want dynamic ONNX shape
+        '--optimize-export',  # Add this for optimized ONNX export
+        '--dynamic-export',  # Add this for dynamic ONNX shape
+        '--simplify',  # Add this to simplify exported ONNX model
+        '--simplify-input-shape', '640', '640'  # Adjust input shape accordingly
+    ]
+
+    output_path = f'{output_folder}/yolov7.onnx'
+    cmd.extend(['--output', output_path])
+
+    subprocess.run(cmd)
+
+# Example usage
+export_yolov7(device='cpu', weights='./yolov7.pt', img_size=640, output_folder='./exported_models', include=['onnx'])
