@@ -1,0 +1,20 @@
+from train import train
+
+def main():
+    # Your specific configuration and arguments
+    your_args = {
+        'hyp': 'path/to/your/hyp.yaml',  # specify the path to your hyperparameters file
+        'opt': {
+            'weights': 'yolo7.pt',  # initial weights path
+            # Add other parameters here
+        },
+        'device': 'cuda',  # specify your desired device
+        'tb_writer': None  # specify your TensorBoard writer if needed
+    }
+
+    # Call the train function with your arguments
+    train(**your_args)
+
+if __name__ == "__main__":
+    main()
+￼Enter
