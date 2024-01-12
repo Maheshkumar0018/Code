@@ -1,0 +1,31 @@
+import os
+
+path = 'runs/train/yolo/weights/file.onnx'
+
+filename = os.path.basename(path)
+directory = os.path.dirname(path)
+
+print("Filename:", filename)
+print("Directory:", directory)
+
+
+path = 'folder/folder/folder/folder/file'
+
+# Split the path into components
+path_components = path.split('/')
+
+# Print the components
+print("Path Components:", path_components)
+
+
+path_components = ['folder', 'folder', 'folder', 'folder', 'file']
+
+# Join the path components using '/'
+reconstructed_path = '/'.join(path_components)
+
+print("Reconstructed Path:", reconstructed_path)
+
+# Reconstruct the path using os.path.join
+reconstructed_path = os.path.join(*path_components)
+
+print("Reconstructed Path:", reconstructed_path)
