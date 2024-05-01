@@ -2,6 +2,6 @@ Here, m.implicit is an instance of nn.Parameter, which is a learnable parameter 
 
 So, the code is correctly identifying the ImplicitA and ImplicitM layers, extracting the implicit parameter (which is a learnable weight), and appending it to the unwrapped_parameters list with the dimension specified as 1.
 
-
+https://becominghuman.ai/using-variational-autoencoder-vae-to-generate-new-images-14328877e88d
 
 
