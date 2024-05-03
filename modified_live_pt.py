@@ -288,3 +288,46 @@ sys.exit()
 
 
 
+import csv
+import matplotlib.pyplot as plt
+
+def read_process_data(filename):
+    process_data = []
+    with open(filename, mode='r') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            process_data.append({
+                'PID': int(row['PID']),
+                'Process Name': row['Process Name'],
+                'Time': row['Time'],
+                'CPU Usage (%)': float(row['CPU Usage (%)']),
+                'Memory Usage (%)': float(row['Memory Usage (%)'])
+            })
+    return process_data
+
+def plot_process_data(process_data):
+    unique_process_names = set([entry['Process Name'] for entry in process_data])
+    for process_name in unique_process_names:
+        fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+        fig.suptitle(f'CPU and Memory Usage for {process_name}')
+        for entry in process_data:
+            if entry['Process Name'] == process_name:
+                axs[0].plot(entry['Time'], entry['CPU Usage (%)'], label=f'PID: {entry["PID"]}')
+                axs[1].plot(entry['Time'], entry['Memory Usage (%)'], label=f'PID: {entry["PID"]}')
+        axs[0].set_ylabel('CPU Usage (%)')
+        axs[1].set_ylabel('Memory Usage (%)')
+        for ax in axs:
+            ax.set_xlabel('Time')
+            ax.legend()
+            ax.grid(True)
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+        plt.tight_layout()
+        plt.show()
+
+# Example usage:
+filename = 'process_data.csv'
+data = read_process_data(filename)
+plot_process_data(data)
+
+
+
