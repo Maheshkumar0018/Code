@@ -1,0 +1,48 @@
+import gzip
+import shutil
+import time
+
+def compress_csv(input_file, output_file):
+    with open(input_file, 'rb') as f_in:
+        with gzip.open(output_file, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+
+# Example usage:
+input_file = 'live_data.csv'
+output_file = 'live_data.csv.gz'
+compression_interval = 60  # Compress every 60 seconds
+
+while True:
+    # Your live data appending code goes here...
+
+    # Perform compression every compression_interval seconds
+    time.sleep(compression_interval)
+    compress_csv(input_file, output_file)
+
+
+method 2
+
+import gzip
+import shutil
+import time
+from threading import Thread
+
+def compress_csv(input_file, output_file):
+    with open(input_file, 'rb') as f_in:
+        with gzip.open(output_file, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+
+def compress_periodically(input_file, output_file, interval):
+    while True:
+        compress_csv(input_file, output_file)
+        time.sleep(interval)
+
+# Example usage:
+input_file = 'live_data.csv'
+output_file = 'live_data.csv.gz'
+compression_interval = 60  # Compress every 60 seconds
+
+compression_thread = Thread(target=compress_periodically, args=(input_file, output_file, compression_interval))
+compression_thread.start()
+
+# Your live data appending code goes here...
