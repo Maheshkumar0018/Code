@@ -1,79 +1,72 @@
-train_args = {
-    'weights': 'yolo7.pt',
-    'cfg': '',
-    'data': 'data/coco.yaml',
-    'hyp': 'data/hyp.scratch.p5.yaml',
-    'epochs': 300,
-    'batch_size': 16,
-    'img_size': [640, 640],
-    'rect': False,
-    'resume': False,
-    'nosave': False,
-    'notest': False,
-    'noautoanchor': False,
-    'evolve': False,
-    'bucket': '',
-    'cache_images': False,
-    'image_weights': False,
-    'device': '',
-    'multi_scale': False,
-    'single_cls': False,
-    'adam': False,
-    'sync_bn': False,
-    'local_rank': -1,
-    'workers': 8,
-    'project': 'runs/train',
-    'entity': None,
-    'name': 'exp',
-    'exist_ok': False,
-    'quad': False,
-    'linear_lr': False,
-    'label_smoothing': 0.0,
-    'upload_dataset': False,
-    'bbox_interval': -1,
-    'save_period': -1,
-    'artifact_alias': 'latest',
-    'freeze': [0],
-    'v5_metric': False,
-}
+import subprocess
+import os
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+# def run_train_script():
+#     # Determine the correct path based on the operating system
+#     if os.name == 'nt':
+#         venv_python = os.path.join('..', 'New folder (3)', 'venv', 'Scripts', 'python.exe')
+#     else:
+#         venv_python = os.path.join('..', 'New folder (3)', 'venv', 'Scripts', 'python')
 
-app = FastAPI()
+#     # Path to the train.py script
+#     train_script = os.path.join('..', 'New folder (3)', 'train.py')
+    
+#     # Print paths to debug
+#     print(f"Virtual environment Python path: {venv_python}")
+#     print(f"Train script path: {train_script}")
 
-class TrainParams(BaseModel):
-    weights: str
-    cfg: str
-    data: str
-    hyp: str
-    epochs: int
-    # Add other parameters here...
+#     # Check if the paths actually exist
+#     if not os.path.isfile(venv_python):
+#         raise FileNotFoundError(f"Python interpreter not found at: {venv_python}")
+#     if not os.path.isfile(train_script):
+#         raise FileNotFoundError(f"train.py not found at: {train_script}")
 
-@app.post("/train/")
-async def train_yolov7(params: TrainParams, manual_weights: str = None, manual_cfg: str = None, manual_data: str = None):
-    train_args = {
-        'weights': manual_weights if manual_weights else params.weights,
-        'cfg': manual_cfg if manual_cfg else params.cfg,
-        'data': manual_data if manual_data else params.data,
-        'hyp': params.hyp,
-        'epochs': params.epochs,
-        # Add other parameters here...
-    }
+#     # Run the train.py script using the virtual environment's Python interpreter
+#     try:
+#         subprocess.run([venv_python, train_script], check=True)
+#     except subprocess.CalledProcessError as e:
+#         print(f"An error occurred while running the script: {e}")
 
-    # Call your train function with the arguments dictionary
-    train(**train_args)
-    return {"message": "Training started."}
-
-
+# if __name__ == '__main__':
+#     run_train_script()
 
 
 import subprocess
+import os
 
-def activate_virtualenv(venv_path):
-    activate_script = f"source {venv_path}/bin/activate"
-    subprocess.run(["bash", "-c", activate_script])
+def run_train_script(data, weights, epochs):
+    # Determine the correct path based on the operating system
+    if os.name == 'nt':  # Check if the OS is Windows
+        venv_python = os.path.join('..', 'New folder (3)', 'venv', 'Scripts', 'python.exe')
+    else:  # For Unix-like systems (Linux, macOS)
+        venv_python = os.path.join('..', 'New folder (3)', 'venv', 'bin', 'python')
 
-# Example usage:
-activate_virtualenv("path/to/your/virtualenv")
+    # Path to the train.py script
+    train_script = os.path.join('..', 'New folder (3)', 'train.py')
 
+    # Construct the command to run
+    command = [venv_python, train_script, "--data", data, "--weights", weights, "--epochs", str(epochs)]
+
+    # Print command to debug
+    print(f"Command to execute: {' '.join(command)}")
+
+    # Check if the paths actually exist
+    if not os.path.isfile(venv_python):
+        raise FileNotFoundError(f"Python interpreter not found at: {venv_python}")
+    if not os.path.isfile(train_script):
+        raise FileNotFoundError(f"train.py not found at: {train_script}")
+
+    # Run the train.py script using the virtual environment's Python interpreter
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while running the script: {e}")
+
+if __name__ == '__main__':
+    # Example arguments
+    data = "./data/custom.yaml"
+    weights = './yolov7.pt'
+    epochs = 100
+
+    # Run the train script with the provided arguments
+    run_train_script(data, weights, epochs)
