@@ -31,6 +31,33 @@ async def train_yolo(yolo_params: YoloTrainingParams):
     # Run the command using subprocess
     result = subprocess.run(command, capture_output=True, text=True)
 
+
+
+import subprocess
+
+# Define the path to the virtual environment's Python interpreter
+virtualenv_path = "/path/to/your/virtualenv/bin/python"  # Adjust this path
+
+# Define the path to the Python script
+python_script = "your_script.py"  # Adjust this path
+
+# Additional command-line arguments
+cmd = "--argument value"
+
+# Construct the command as a list
+command = [virtualenv_path, python_script, cmd]
+
+# Run the command using subprocess
+result = subprocess.run(command, capture_output=True, text=True)
+
+# Print the output
+print("STDOUT:")
+print(result.stdout)
+print("STDERR:")
+print(result.stderr)
+
+
+
     # Return the output of the script
     return {"stdout": result.stdout, "stderr": result.stderr}
 
