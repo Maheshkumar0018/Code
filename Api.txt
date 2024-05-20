@@ -72,3 +72,47 @@ if __name__ == "__main__":
 
 
 chmod -R 755 /path/to/your/virtualenv
+
+
+
+
+import os
+import subprocess
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class YoloTrainingParams(BaseModel):
+    batch_size: int = Field(..., description="Batch size for training")
+    epochs: int = Field(..., description="Number of training epochs")
+    learning_rate: float = Field(..., description="Learning rate for training")
+    data_path: str = Field(..., description="Path to the dataset")
+    model_config_path: str = Field(..., description="Path to YOLO model configuration file")
+    pretrained_weights_path: str = Field(..., description="Path to pretrained weights file")
+    output_dir: str = Field(..., description="Output directory to save trained model")
+
+@app.post("/train_yolo")
+async def train_yolo(yolo_params: YoloTrainingParams):
+    # Construct the command to run train.py with the provided parameters
+    command = [
+        "python",
+        "train.py",
+        f"--batch-size={yolo_params.batch_size}",
+        f"--epochs={yolo_params.epochs}",
+        f"--learning-rate={yolo_params.learning_rate}",
+        f"--data={yolo_params.data_path}",
+        f"--cfg={yolo_params.model_config_path}",
+        f"--weights={yolo_params.pretrained_weights_path}",
+        f"--output={yolo_params.output_dir}"
+    ]
+
+    # Run the command using subprocess with the current environment variables
+    result = subprocess.run(command, capture_output=True, text=True, env=os.environ)
+
+    # Return the output of the script
+    return {"stdout": result.stdout, "stderr": result.stderr}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
