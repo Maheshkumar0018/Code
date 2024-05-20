@@ -1,0 +1,67 @@
+train_args = {
+    'weights': 'yolo7.pt',
+    'cfg': '',
+    'data': 'data/coco.yaml',
+    'hyp': 'data/hyp.scratch.p5.yaml',
+    'epochs': 300,
+    'batch_size': 16,
+    'img_size': [640, 640],
+    'rect': False,
+    'resume': False,
+    'nosave': False,
+    'notest': False,
+    'noautoanchor': False,
+    'evolve': False,
+    'bucket': '',
+    'cache_images': False,
+    'image_weights': False,
+    'device': '',
+    'multi_scale': False,
+    'single_cls': False,
+    'adam': False,
+    'sync_bn': False,
+    'local_rank': -1,
+    'workers': 8,
+    'project': 'runs/train',
+    'entity': None,
+    'name': 'exp',
+    'exist_ok': False,
+    'quad': False,
+    'linear_lr': False,
+    'label_smoothing': 0.0,
+    'upload_dataset': False,
+    'bbox_interval': -1,
+    'save_period': -1,
+    'artifact_alias': 'latest',
+    'freeze': [0],
+    'v5_metric': False,
+}
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class TrainParams(BaseModel):
+    weights: str
+    cfg: str
+    data: str
+    hyp: str
+    epochs: int
+    # Add other parameters here...
+
+@app.post("/train/")
+async def train_yolov7(params: TrainParams, manual_weights: str = None, manual_cfg: str = None, manual_data: str = None):
+    train_args = {
+        'weights': manual_weights if manual_weights else params.weights,
+        'cfg': manual_cfg if manual_cfg else params.cfg,
+        'data': manual_data if manual_data else params.data,
+        'hyp': params.hyp,
+        'epochs': params.epochs,
+        # Add other parameters here...
+    }
+
+    # Call your train function with the arguments dictionary
+    train(**train_args)
+    return {"message": "Training started."}
+
