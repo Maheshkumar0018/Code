@@ -65,3 +65,15 @@ async def train_yolov7(params: TrainParams, manual_weights: str = None, manual_c
     train(**train_args)
     return {"message": "Training started."}
 
+
+
+
+import subprocess
+
+def activate_virtualenv(venv_path):
+    activate_script = f"source {venv_path}/bin/activate"
+    subprocess.run(["bash", "-c", activate_script])
+
+# Example usage:
+activate_virtualenv("path/to/your/virtualenv")
+
