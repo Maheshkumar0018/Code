@@ -1,0 +1,59 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Read the CSV file
+df = pd.read_csv('./process_data.csv')
+
+# Group by PID and aggregate the min and max for CPU Usage and Memory Usage
+# version - 1
+result = df.groupby(['PID', 'Process Name']).agg(
+    min_cpu_usage=pd.NamedAgg(column='CPU Usage (%)', aggfunc='min'),
+    max_cpu_usage=pd.NamedAgg(column='CPU Usage (%)', aggfunc='max'),
+    min_memory_usage=pd.NamedAgg(column='Memory Usage (%)', aggfunc='min'),
+    max_memory_usage=pd.NamedAgg(column='Memory Usage (%)', aggfunc='max')
+).reset_index()
+
+with open('usage_report.txt', 'w') as report_file:
+    for _, row in result.iterrows():
+        report_file.write(f"Process Name: {row['Process Name']}, PID: {row['PID']}\n")
+        report_file.write(f"Minimum CPU usage: {row['min_cpu_usage']}%\n")
+        report_file.write(f"Maximum CPU usage: {row['max_cpu_usage']}%\n\n")
+        report_file.write(f"Minimum memory usage: {row['min_memory_usage']}%\n")
+        report_file.write(f"Maximum memory usage: {row['max_memory_usage']}%\n")
+        report_file.write('-' * 30 + "\n")
+
+# Display the result
+print(result)
+# result.to_csv('usage_report.csv', index=False)
+
+
+# Function to highlight upward changes
+def plot_usage(df, pid, usage_col, ylabel, title, filename):
+    df_pid = df[df['PID'] == pid].reset_index()
+    plt.figure(figsize=(14, 7))
+    
+    for i in range(1, len(df_pid)):
+        if df_pid.loc[i, usage_col] > df_pid.loc[i-1, usage_col]:
+            plt.plot(df_pid.loc[i-1:i, 'Time'], df_pid.loc[i-1:i, usage_col], 'r', label='Increase' if i == 1 else "")
+            plt.text(df_pid.loc[i, 'Time'], df_pid.loc[i, usage_col], f"{df_pid.loc[i, usage_col]:.1f}%", color='red')
+        else:
+            plt.plot(df_pid.loc[i-1:i, 'Time'], df_pid.loc[i-1:i, usage_col], 'b', label='Normal' if i == 1 else "")
+    
+    plt.xlabel('Time')
+    plt.ylabel(ylabel)
+    plt.title(f'{title} for PID {pid}')
+    plt.legend()
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(filename)
+    # plt.show()
+    plt.tight_layout()
+    plt.close()
+
+
+
+for pid in result['PID']:
+    cpu_filename = f'cpu_usage_{pid}.png'
+    memory_filename = f'memory_usage_{pid}.png'
+    plot_usage(df, pid, 'CPU Usage (%)', 'CPU Usage (%)', 'CPU Usage',  cpu_filename)
+    plot_usage(df, pid, 'Memory Usage (%)', 'Memory Usage (%)', 'Memory Usage', memory_filename)
