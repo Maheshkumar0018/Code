@@ -57,3 +57,22 @@ for pid in result['PID']:
     memory_filename = f'memory_usage_{pid}.png'
     plot_usage(df, pid, 'CPU Usage (%)', 'CPU Usage (%)', 'CPU Usage',  cpu_filename)
     plot_usage(df, pid, 'Memory Usage (%)', 'Memory Usage (%)', 'Memory Usage', memory_filename)
+
+#############################################
+
+result = df.groupby(['PID', 'Process Name']).agg(
+    min_cpu_usage=pd.NamedAgg(column='CPU Usage (%)', aggfunc='min'),
+    max_cpu_usage=pd.NamedAgg(column='CPU Usage (%)', aggfunc='max'),
+    min_memory_usage=pd.NamedAgg(column='Memory Usage (%)', aggfunc='min'),
+    max_memory_usage=pd.NamedAgg(column='Memory Usage (%)', aggfunc='max')
+).reset_index()
+
+result['max_cpu_usage'] = result['max_cpu_usage'].apply(lambda x: min(x, 100))
+result['max_memory_usage'] = result['max_memory_usage'].apply(lambda x: min(x, 100))
+
+result['min_cpu_usage'] = result['min_cpu_usage'].apply(lambda x: f"{x:.2f}%")
+result['max_cpu_usage'] = result['max_cpu_usage'].apply(lambda x: f"{x:.2f}%")
+result['min_memory_usage'] = result['min_memory_usage'].apply(lambda x: f"{x:.2f}%")
+result['max_memory_usage'] = result['max_memory_usage'].apply(lambda x: f"{x:.2f}%")
+
+print("results:",result)
