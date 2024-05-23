@@ -76,3 +76,41 @@ result['min_memory_usage'] = result['min_memory_usage'].apply(lambda x: f"{x:.2f
 result['max_memory_usage'] = result['max_memory_usage'].apply(lambda x: f"{x:.2f}%")
 
 print("results:",result)
+
+######################################################
+import pandas as pd
+from datetime import datetime, timedelta
+df = pd.read_csv("./process_data.csv")
+
+# Convert the 'Time' column to datetime
+df['Time'] = pd.to_datetime(df['Time'])
+
+# Calculate the time difference from the first timestamp and convert to seconds
+df['Time (seconds)'] = (df['Time'] - df['Time'].iloc[0]).dt.total_seconds().astype(int) + 1
+initial_period_end_time = df['Time'].min() + timedelta(seconds=7)
+initial_df = df[df['Time'] <= initial_period_end_time]
+print("initial df",initial_df)
+
+final_df = df[df['Time'] > initial_period_end_time]
+print("remaining_df ",final_df)
+
+initial_result = initial_df.groupby(['PID', 'Process Name']).agg(
+    min_cpu_usage_initial=pd.NamedAgg(column='CPU Usage (%)', aggfunc='min'),
+    max_cpu_usage_initial=pd.NamedAgg(column='CPU Usage (%)', aggfunc='max'),
+    min_memory_usage_initial=pd.NamedAgg(column='Memory Usage (%)', aggfunc='min'),
+    max_memory_usage_initial=pd.NamedAgg(column='Memory Usage (%)', aggfunc='max')
+).reset_index()
+
+# Aggregate the final period data
+final_result = final_df.groupby(['PID', 'Process Name']).agg(
+    min_cpu_usage_final=pd.NamedAgg(column='CPU Usage (%)', aggfunc='min'),
+    max_cpu_usage_final=pd.NamedAgg(column='CPU Usage (%)', aggfunc='max'),
+    min_memory_usage_final=pd.NamedAgg(column='Memory Usage (%)', aggfunc='min'),
+    max_memory_usage_final=pd.NamedAgg(column='Memory Usage (%)', aggfunc='max')
+).reset_index()
+
+result = pd.merge(initial_result, final_result, on=['PID', 'Process Name'])
+for col in ['min_cpu_usage_initial', 'max_cpu_usage_initial', 'min_memory_usage_initial', 'max_memory_usage_initial',
+            'min_cpu_usage_final', 'max_cpu_usage_final', 'min_memory_usage_final', 'max_memory_usage_final']:
+    result[col] = result[col].apply(lambda x: f"{x:.2f}%")
+print('result: ',result)
