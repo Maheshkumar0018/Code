@@ -1,122 +1,139 @@
-import subprocess
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
+import pandas as pd
+import numpy as np
+from geopy.distance import geodesic
+from tqdm import tqdm
+from shapely.geometry import Point as ShapelyPoint
 
-app = FastAPI()
+def find_nearest_points_between_times(group, start_time, end_time, start_lat, start_lon, end_lat, end_lon):
+    """
+    Find the nearest points from other ships within a given time range.
 
-class YoloTrainingParams(BaseModel):
-    batch_size: int = Field(..., description="Batch size for training")
-    epochs: int = Field(..., description="Number of training epochs")
-    learning_rate: float = Field(..., description="Learning rate for training")
-    data_path: str = Field(..., description="Path to the dataset")
-    model_config_path: str = Field(..., description="Path to YOLO model configuration file")
-    pretrained_weights_path: str = Field(..., description="Path to pretrained weights file")
-    output_dir: str = Field(..., description="Output directory to save trained model")
+    Parameters:
+    - group: DataFrame containing points of other ships.
+    - start_time, end_time: Time range to filter points.
+    - start_lat, start_lon: Start coordinates of the gap.
+    - end_lat, end_lon: End coordinates of the gap.
 
-@app.post("/train_yolo")
-async def train_yolo(yolo_params: YoloTrainingParams):
-    # Construct the command to run train.py with the provided parameters
-    command = [
-        "python",
-        "train.py",
-        f"--batch-size={yolo_params.batch_size}",
-        f"--epochs={yolo_params.epochs}",
-        f"--learning-rate={yolo_params.learning_rate}",
-        f"--data={yolo_params.data_path}",
-        f"--cfg={yolo_params.model_config_path}",
-        f"--weights={yolo_params.pretrained_weights_path}",
-        f"--output={yolo_params.output_dir}"
-    ]
+    Returns:
+    - nearest_points: List of points (lat, lon) between the given time range.
+    """
+    # Filter data for the given time range
+    filtered = group[(group['BaseDateTime'] > start_time) & (group['BaseDateTime'] < end_time)]
+    nearest_points = []
 
-    # Run the command using subprocess
-    result = subprocess.run(command, capture_output=True, text=True)
+    for _, row in filtered.iterrows():
+        point = ShapelyPoint(row['LON'], row['LAT'])
+        # Calculate distances to start and end points
+        dist_to_start = geodesic((start_lat, start_lon), (row['LAT'], row['LON'])).meters
+        dist_to_end = geodesic((end_lat, end_lon), (row['LAT'], row['LON'])).meters
+        if dist_to_start < 10000 or dist_to_end < 10000:  # Threshold (10 km)
+            nearest_points.append((row['LAT'], row['LON']))
 
+    return nearest_points
 
+def geodesic_interpolation(start_lat, start_lon, end_lat, end_lon, num_points):
+    """
+    Perform geodesic interpolation between two points.
 
-import subprocess
+    Parameters:
+    - start_lat, start_lon: Coordinates of the start point.
+    - end_lat, end_lon: Coordinates of the end point.
+    - num_points: Number of intermediate points to generate.
 
-# Define the path to the virtual environment's Python interpreter
-virtualenv_path = "/path/to/your/virtualenv/bin/python"  # Adjust this path
+    Returns:
+    - lats, lons: Lists of interpolated latitude and longitude values.
+    """
+    total_distance = geodesic((start_lat, start_lon), (end_lat, end_lon)).meters
+    lats, lons = [], []
+    for frac in np.linspace(0, 1, num_points):
+        distance_to_point = total_distance * frac
+        interpolated_point = geodesic(meters=distance_to_point).destination((start_lat, start_lon), geodesic((start_lat, start_lon), (end_lat, end_lon)).initial)
+        lats.append(interpolated_point.latitude)
+        lons.append(interpolated_point.longitude)
+    return lats, lons
 
-# Define the path to the Python script
-python_script = "your_script.py"  # Adjust this path
+def process_mmsi_data(data, time_gap_threshold=30 * 60, fallback_interpolation=True):
+    """
+    Process AIS data for each MMSI.
 
-# Additional command-line arguments
-cmd = "--argument value"
+    Parameters:
+    - data: DataFrame containing AIS data.
+    - time_gap_threshold: Threshold in seconds to consider a gap large.
+    - fallback_interpolation: Boolean to enable geodesic interpolation when no nearby ships are found.
 
-# Construct the command as a list
-command = [virtualenv_path, python_script, cmd]
+    Returns:
+    - processed_paths: List of paths (lat, lon) for all MMSIs.
+    """
+    processed_paths = []
 
-# Run the command using subprocess
-result = subprocess.run(command, capture_output=True, text=True)
+    # Group data by MMSI
+    grouped_data = data.groupby('MMSI')
+    for mmsi, group in tqdm(grouped_data, desc="Processing MMSI", unit="MMSI"):
+        group = group.sort_values(by='BaseDateTime')
+        group['BaseDateTime'] = pd.to_datetime(group['BaseDateTime'])
+        mmsi_paths = []
 
-# Print the output
-print("STDOUT:")
-print(result.stdout)
-print("STDERR:")
-print(result.stderr)
+        for i in range(len(group) - 1):
+            current_row = group.iloc[i]
+            next_row = group.iloc[i + 1]
 
+            time_diff = (next_row['BaseDateTime'] - current_row['BaseDateTime']).total_seconds()
 
+            # If the gap is small, keep the path
+            if time_diff <= time_gap_threshold:
+                mmsi_paths.append((current_row['LAT'], current_row['LON']))
+                continue
 
-    # Return the output of the script
-    return {"stdout": result.stdout, "stderr": result.stderr}
+            # If the gap is large, find nearest points from other ships
+            other_ships = data[data['MMSI'] != mmsi]
+            nearest_points = find_nearest_points_between_times(
+                other_ships,
+                current_row['BaseDateTime'],
+                next_row['BaseDateTime'],
+                current_row['LAT'],
+                current_row['LON'],
+                next_row['LAT'],
+                next_row['LON']
+            )
 
-# Activate the YOLO virtual environment before running the FastAPI server
-activate_command = "/path/to/your/yolo_env/bin/activate"  # Adjust this path
-subprocess.run(["source", activate_command], shell=True)
+            if nearest_points:
+                print(f"Found {len(nearest_points)} nearby points for MMSI={mmsi} between {current_row['BaseDateTime']} and {next_row['BaseDateTime']}")
+            else:
+                print(f"No nearby points found for MMSI={mmsi} between {current_row['BaseDateTime']} and {next_row['BaseDateTime']}")
 
+            # Include current point, nearest points, and next point
+            mmsi_paths.append((current_row['LAT'], current_row['LON']))
+
+            if nearest_points:
+                mmsi_paths.extend(nearest_points)
+            elif fallback_interpolation:
+                # Fallback to interpolation
+                interpolated_lats, interpolated_lons = geodesic_interpolation(
+                    current_row['LAT'], current_row['LON'],
+                    next_row['LAT'], next_row['LON'],
+                    num_points=5  # Adjust number of points as needed
+                )
+                mmsi_paths.extend(zip(interpolated_lats, interpolated_lons))
+
+            mmsi_paths.append((next_row['LAT'], next_row['LON']))
+
+        processed_paths.append(mmsi_paths)
+
+    return processed_paths
+
+# Example usage
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Load AIS data
+    df = pd.read_csv("/path/to/modified_ais_data.csv")
+    df['BaseDateTime'] = pd.to_datetime(df['BaseDateTime'])  # Ensure datetime parsing
 
+    # Process data for all MMSIs
+    processed_paths = process_mmsi_data(df)
 
-
-chmod -R 755 /path/to/your/virtualenv
-
-
-
-
-import os
-import subprocess
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
-
-app = FastAPI()
-
-class YoloTrainingParams(BaseModel):
-    batch_size: int = Field(..., description="Batch size for training")
-    epochs: int = Field(..., description="Number of training epochs")
-    learning_rate: float = Field(..., description="Learning rate for training")
-    data_path: str = Field(..., description="Path to the dataset")
-    model_config_path: str = Field(..., description="Path to YOLO model configuration file")
-    pretrained_weights_path: str = Field(..., description="Path to pretrained weights file")
-    output_dir: str = Field(..., description="Output directory to save trained model")
-
-@app.post("/train_yolo")
-async def train_yolo(yolo_params: YoloTrainingParams):
-    # Construct the command to run train.py with the provided parameters
-    command = [
-        "python",
-        "train.py",
-        f"--batch-size={yolo_params.batch_size}",
-        f"--epochs={yolo_params.epochs}",
-        f"--learning-rate={yolo_params.learning_rate}",
-        f"--data={yolo_params.data_path}",
-        f"--cfg={yolo_params.model_config_path}",
-        f"--weights={yolo_params.pretrained_weights_path}",
-        f"--output={yolo_params.output_dir}"
+    # Save processed paths to CSV (flatten the list for saving)
+    flattened_paths = [
+        {"LAT": lat, "LON": lon} for path in processed_paths for lat, lon in path
     ]
+    pd.DataFrame(flattened_paths).to_csv("processed_paths.csv", index=False)
 
-    # Run the command using subprocess with the current environment variables
-    result = subprocess.run(command, capture_output=True, text=True, env=os.environ)
-
-    # Return the output of the script
-    return {"stdout": result.stdout, "stderr": result.stderr}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
-
-
-subprocess.run(["source", activate_command], shell=True)
+    print("Processed paths saved to 'processed_paths.csv'.")
