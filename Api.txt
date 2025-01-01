@@ -137,3 +137,139 @@ if __name__ == "__main__":
     pd.DataFrame(flattened_paths).to_csv("processed_paths.csv", index=False)
 
     print("Processed paths saved to 'processed_paths.csv'.")
+
+
+
+===============================================================================================
+import geopandas as gpd
+import pandas as pd
+import numpy as np
+from geopy.distance import geodesic
+from shapely.geometry import Point as ShapelyPoint
+from tqdm import tqdm
+
+def apply_buffer_to_water_mask(water_mask, buffer_distance=0.01):
+    """
+    Apply a buffer around water polygons in the world shapefile.
+
+    Parameters:
+    - water_mask: GeoDataFrame containing water polygons.
+    - buffer_distance: Distance for buffering (in degrees, ~1 km for 0.01).
+
+    Returns:
+    - buffered_water_mask: Buffered GeoDataFrame for water polygons.
+    """
+    print("Applying buffer to water polygons...")
+    buffered_water_mask = water_mask.buffer(buffer_distance)
+    return gpd.GeoDataFrame(geometry=buffered_water_mask, crs=water_mask.crs)
+
+def geodesic_interpolation_with_land_check(
+    start_lat, start_lon, end_lat, end_lon, num_points, buffered_water_mask
+):
+    """
+    Perform geodesic interpolation between two points, ensuring points remain on water.
+
+    Parameters:
+    - start_lat, start_lon: Coordinates of the start point.
+    - end_lat, end_lon: Coordinates of the end point.
+    - num_points: Number of intermediate points to generate.
+    - buffered_water_mask: Buffered GeoDataFrame for water polygons.
+
+    Returns:
+    - valid_points: List of valid interpolated points (lat, lon) on water.
+    """
+    total_distance = geodesic((start_lat, start_lon), (end_lat, end_lon)).meters
+    lats, lons = [], []
+    spatial_index = buffered_water_mask.sindex  # Create a spatial index for efficient lookups
+
+    for frac in np.linspace(0, 1, num_points):
+        distance_to_point = total_distance * frac
+        interpolated_point = geodesic(meters=distance_to_point).destination((start_lat, start_lon))
+        lat, lon = interpolated_point.latitude, interpolated_point.longitude
+        point = ShapelyPoint(lon, lat)
+
+        # Check if the point is within any buffered water polygon
+        possible_matches_index = list(spatial_index.intersection(point.bounds))
+        possible_matches = buffered_water_mask.iloc[possible_matches_index]
+
+        if not possible_matches.contains(point).any():
+            print(f"Skipping interpolated point on land or near boundary: ({lat}, {lon})")
+            continue
+
+        lats.append(lat)
+        lons.append(lon)
+
+    valid_points = list(zip(lats, lons))
+    return valid_points
+
+def process_with_fallback_interpolation(data, water_mask, buffer_distance=0.01, time_gap_threshold=30 * 60):
+    """
+    Process AIS data with fallback interpolation, ensuring points remain on water.
+
+    Parameters:
+    - data: DataFrame containing AIS data.
+    - water_mask: GeoDataFrame containing water polygons.
+    - buffer_distance: Buffer distance for water polygons.
+    - time_gap_threshold: Threshold in seconds for identifying large gaps.
+
+    Returns:
+    - processed_paths: List of paths (lat, lon) for all MMSIs.
+    """
+    buffered_water_mask = apply_buffer_to_water_mask(water_mask, buffer_distance)
+    processed_paths = []
+
+    grouped_data = data.groupby('MMSI')
+    for mmsi, group in tqdm(grouped_data, desc="Processing MMSI", unit="MMSI"):
+        group = group.sort_values(by='BaseDateTime')
+        group['BaseDateTime'] = pd.to_datetime(group['BaseDateTime'])
+        mmsi_paths = []
+
+        for i in range(len(group) - 1):
+            current_row = group.iloc[i]
+            next_row = group.iloc[i + 1]
+
+            time_diff = (next_row['BaseDateTime'] - current_row['BaseDateTime']).total_seconds()
+
+            if time_diff <= time_gap_threshold:
+                mmsi_paths.append((current_row['LAT'], current_row['LON']))
+                continue
+
+            print(f"Large time gap detected ({time_diff} seconds) between points.")
+            num_points = int(time_diff / 900) + 1  # 15-minute intervals
+            interpolated_points = geodesic_interpolation_with_land_check(
+                current_row['LAT'],
+                current_row['LON'],
+                next_row['LAT'],
+                next_row['LON'],
+                num_points,
+                buffered_water_mask
+            )
+
+            # Include valid interpolated points
+            mmsi_paths.append((current_row['LAT'], current_row['LON']))
+            mmsi_paths.extend(interpolated_points)
+            mmsi_paths.append((next_row['LAT'], next_row['LON']))
+
+        processed_paths.append(mmsi_paths)
+
+    return processed_paths
+
+# Example Usage
+if __name__ == "__main__":
+    # Load AIS data
+    df = pd.read_csv("/path/to/modified_ais_data.csv")
+    df['BaseDateTime'] = pd.to_datetime(df['BaseDateTime'])  # Ensure datetime parsing
+
+    # Load water mask (shapefile with global water boundaries)
+    water_mask = gpd.read_file("/path/to/world_shapefile.shp")
+
+    # Process AIS data
+    processed_paths = process_with_fallback_interpolation(df, water_mask)
+
+    # Save processed paths to CSV (flatten the list for saving)
+    flattened_paths = [
+        {"LAT": lat, "LON": lon} for path in processed_paths for lat, lon in path
+    ]
+    pd.DataFrame(flattened_paths).to_csv("processed_paths.csv", index=False)
+
+    print("Processed paths saved to 'processed_paths.csv'.")
