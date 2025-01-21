@@ -1,65 +1,53 @@
-def format_sequences(sequences, input_features, output_features, window_size, predicted_seq_len):
-    """
-    Format sequences for Seq2Seq model with padding.
 
-    Parameters:
-    - sequences: List of dictionaries with 'X' and 'Y'.
-    - input_features: List of feature names for inputs.
-    - output_features: List of feature names for outputs.
-    - window_size: Length of the input sequence.
-    - predicted_seq_len: Length of the predicted sequence.
+Use the Spherical System:
 
-    Returns:
-    - encoder_inputs: NumPy array of shape (num_sequences, window_size, num_features).
-    - decoder_inputs: NumPy array of shape (num_sequences, predicted_seq_len, num_features).
-    - targets: NumPy array of shape (num_sequences, predicted_seq_len, num_features).
-    """
-    encoder_inputs = []
-    decoder_inputs = []
-    targets = []
+To compute the new coordinates, the course and distance are used to project movement on a sphere.
+Convert 
+COG from degrees to radians:
+COG (radians)=COG (degrees)×𝜋180
 
-    for seq_idx, seq in enumerate(sequences):
-        try:
-            # Process encoder inputs with padding/truncation
-            enc_input = np.array([seq['X'][feature] for feature in input_features], dtype=np.float32).T
-            if enc_input.shape[0] < window_size:
-                padding = np.zeros((window_size - enc_input.shape[0], len(input_features)), dtype=np.float32)
-                enc_input = np.vstack((enc_input, padding))
-            elif enc_input.shape[0] > window_size:
-                enc_input = enc_input[:window_size]
 
-            # Process decoder inputs with padding/truncation
-            y_data = np.array([seq['Y'][feature] for feature in input_features], dtype=np.float32).T
-            if y_data.shape[0] < predicted_seq_len:
-                padding = np.zeros((predicted_seq_len - y_data.shape[0], len(input_features)), dtype=np.float32)
-                y_data = np.vstack((y_data, padding))
-            elif y_data.shape[0] > predicted_seq_len:
-                y_data = y_data[:predicted_seq_len]
 
-            dec_input = np.zeros((predicted_seq_len, len(input_features)), dtype=np.float32)
-            dec_input[:-1, :] = y_data[:-1]
-            dec_input[-1, :] = y_data[-1]  # Ensure the last row is not empty
+import math
 
-            # Process targets with padding/truncation
-            target = np.array([seq['Y'][feature] for feature in output_features], dtype=np.float32).T
-            if target.shape[0] < predicted_seq_len:
-                padding = np.zeros((predicted_seq_len - target.shape[0], len(output_features)), dtype=np.float32)
-                target = np.vstack((target, padding))
-            elif target.shape[0] > predicted_seq_len:
-                target = target[:predicted_seq_len]
+def calculate_next_xyz(x, y, z, duration, distance, cog, sog, R=6371000):
+    # Convert current x, y, z to latitude (phi) and longitude (lambda)
+    phi = math.asin(z / R)  # Latitude
+    lambd = math.atan2(y, x)  # Longitude
 
-            # Append processed inputs and targets
-            encoder_inputs.append(enc_input)
-            decoder_inputs.append(dec_input)
-            targets.append(target)
+    # Convert COG to radians
+    cog_rad = math.radians(cog)
 
-        except Exception as e:
-            print(f"Sequence {seq_idx}: Error - {e}. Skipping this sequence.")
-            continue
-
-    # Convert lists to arrays
-    return (
-        np.array(encoder_inputs),
-        np.array(decoder_inputs),
-        np.array(targets)
+    # Calculate the new latitude and longitude
+    delta = distance / R  # Angular distance
+    phi_new = math.asin(
+        math.sin(phi) * math.cos(delta) + math.cos(phi) * math.sin(delta) * math.cos(cog_rad)
     )
+    lambd_new = lambd + math.atan2(
+        math.sin(cog_rad) * math.sin(delta) * math.cos(phi),
+        math.cos(delta) - math.sin(phi) * math.sin(phi_new)
+    )
+
+    # Convert back to Cartesian coordinates
+    x_new = R * math.cos(phi_new) * math.cos(lambd_new)
+    y_new = R * math.cos(phi_new) * math.sin(lambd_new)
+    z_new = R * math.sin(phi_new)
+
+    return x_new, y_new, z_new
+
+
+x, y, z = 6378137.0, 0.0, 0.0  # Starting at the equator
+duration = 3600  # 1 hour
+distance = 5000  # 5 km
+cog = 90  # Moving East
+sog = 1.39  # Speed in m/s (optional)
+
+x_new, y_new, z_new = calculate_next_xyz(x, y, z, duration, distance, cog, sog)
+print(f"New coordinates: x={x_new}, y={y_new}, z={z_new}")
+This document provides a mathematical and programmatic approach to calculating the next Cartesian coordinates.
+
+
+
+
+
+
