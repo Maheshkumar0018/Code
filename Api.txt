@@ -1,53 +1,115 @@
+import numpy as np
+import pandas as pd
 
-Use the Spherical System:
+def predict_positions_between_lost_and_found(lost_row, found_row):
+    """
+    Predict intermediate positions between a lost row and a found row,
+    including computation of `distance_km` for each predicted step.
 
-To compute the new coordinates, the course and distance are used to project movement on a sphere.
-Convert 
-COG from degrees to radians:
-COG (radians)=COG (degrees)×𝜋180
+    Parameters:
+    lost_row (pd.Series): Row with initial "lost" position and SOG/COG.
+    found_row (pd.Series): Row with final "found" position and SOG/COG.
 
+    Returns:
+    pd.DataFrame: Predicted positions up to the found row.
+    """
+    KNOTS_TO_METERS_PER_SEC = 0.514444
 
+    # Extract initial and final positions
+    x_start, y_start, z_start = lost_row["x"], lost_row["y"], lost_row["z"]
+    x_end, y_end, z_end = found_row["x"], found_row["y"], found_row["z"]
+    
+    # Extract initial and final speeds and angles
+    sog_start, cog_start = lost_row["SOG"], lost_row["COG"]
+    sog_end, cog_end = found_row["SOG"], found_row["COG"]
+    
+    # Calculate total duration
+    duration_total = found_row["duration_seconds"]
+    
+    # Number of prediction steps
+    num_steps = int(duration_total)  # Assume one step per second
+    if num_steps <= 0:
+        raise ValueError("Duration between lost and found rows must be positive.")
+    
+    # Initialize the prediction DataFrame
+    predictions = []
+    cumulative_distance = 0  # Initialize cumulative distance
 
-import math
+    # Start position for cumulative distance calculation
+    x_previous, y_previous, z_previous = x_start, y_start, z_start
 
-def calculate_next_xyz(x, y, z, duration, distance, cog, sog, R=6371000):
-    # Convert current x, y, z to latitude (phi) and longitude (lambda)
-    phi = math.asin(z / R)  # Latitude
-    lambd = math.atan2(y, x)  # Longitude
+    for step in range(1, num_steps + 1):
+        # Interpolate speed (SOG) and course (COG)
+        sog_interp = sog_start + (sog_end - sog_start) * step / num_steps
+        cog_interp = cog_start + (cog_end - cog_start) * step / num_steps
 
-    # Convert COG to radians
-    cog_rad = math.radians(cog)
+        # Convert SOG to meters per second
+        speed = sog_interp * KNOTS_TO_METERS_PER_SEC
 
-    # Calculate the new latitude and longitude
-    delta = distance / R  # Angular distance
-    phi_new = math.asin(
-        math.sin(phi) * math.cos(delta) + math.cos(phi) * math.sin(delta) * math.cos(cog_rad)
-    )
-    lambd_new = lambd + math.atan2(
-        math.sin(cog_rad) * math.sin(delta) * math.cos(phi),
-        math.cos(delta) - math.sin(phi) * math.sin(phi_new)
-    )
+        # Convert COG to radians
+        cog_radians = np.radians(cog_interp)
 
-    # Convert back to Cartesian coordinates
-    x_new = R * math.cos(phi_new) * math.cos(lambd_new)
-    y_new = R * math.cos(phi_new) * math.sin(lambd_new)
-    z_new = R * math.sin(phi_new)
+        # Compute velocity components
+        vx = speed * np.cos(cog_radians)
+        vy = speed * np.sin(cog_radians)
 
-    return x_new, y_new, z_new
+        # Compute position increment
+        time_step = duration_total / num_steps
+        dx = vx * time_step
+        dy = vy * time_step
 
+        # Calculate intermediate positions
+        x_current = x_start + dx * step
+        y_current = y_start + dy * step
+        z_current = z_start + (z_end - z_start) * step / num_steps
 
-x, y, z = 6378137.0, 0.0, 0.0  # Starting at the equator
-duration = 3600  # 1 hour
-distance = 5000  # 5 km
-cog = 90  # Moving East
-sog = 1.39  # Speed in m/s (optional)
+        # Compute step distance and update cumulative distance
+        step_distance = np.sqrt((x_current - x_previous)**2 + (y_current - y_previous)**2 + (z_current - z_previous)**2)
+        cumulative_distance += step_distance
+        distance_km = cumulative_distance / 1000  # Convert to kilometers
 
-x_new, y_new, z_new = calculate_next_xyz(x, y, z, duration, distance, cog, sog)
-print(f"New coordinates: x={x_new}, y={y_new}, z={z_new}")
-This document provides a mathematical and programmatic approach to calculating the next Cartesian coordinates.
+        # Update previous position
+        x_previous, y_previous, z_previous = x_current, y_current, z_current
 
+        # Append the prediction
+        predictions.append({
+            "step": step,
+            "SOG": sog_interp,
+            "COG": cog_interp,
+            "x": x_current,
+            "y": y_current,
+            "z": z_current,
+            "time_elapsed": step * time_step,
+            "distance_km": distance_km
+        })
 
+    # Convert predictions to a DataFrame
+    predictions_df = pd.DataFrame(predictions)
+    return predictions_df
 
+# Example usage:
+lost_row = pd.Series({
+    "SOG": 0.1,
+    "COG": 220.5,
+    "x": 978.775466,
+    "y": -5636.091653,
+    "z": 2804.658708,
+    "distance_km": 0.563219,
+    "duration_seconds": 62.0
+})
 
+found_row = pd.Series({
+    "SOG": 10.6,
+    "COG": 186.0,
+    "x": 977.761677,
+    "y": -5441.347041,
+    "z": 3166.285755,
+    "distance_km": 0.563219,
+    "duration_seconds": 62.0
+})
 
+# Predict positions between lost and found
+predicted_positions = predict_positions_between_lost_and_found(lost_row, found_row)
 
+# Display the predicted positions
+print(predicted_positions)
