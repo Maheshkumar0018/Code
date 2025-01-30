@@ -97,3 +97,12 @@ Key Updates
 ✅ Works even if z remains constant
 
 This will predict lx, ly, lz more accurately in 3D space. 🚀 Let me know if you need refinements!
+
+===========================================================================
+def nll_loss(y_true, y_pred):
+    mean = y_pred[..., :output_dim]
+    std = y_pred[..., output_dim:]
+    std = tf.keras.backend.maximum(std, tf.keras.backend.epsilon())  # Ensure std > 0
+    dist = tfp.distributions.Normal(loc=mean, scale=std)
+    return -tf.reduce_mean(dist.log_prob(y_true))
+import tensorflow_probability as tfp
