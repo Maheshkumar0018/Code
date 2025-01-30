@@ -1,12 +1,99 @@
-steps= 
-speed×duration per step
-total distance
-​
- 
-Given:
-Lost point (lat_lost, lon_lost)
-Found point (lat_found, lon_found)
-Total distance (meters)
-Duration (seconds)
-Speed (SOG) (knots, which needs conversion to meters per second)
-Step duration (e.g., every 1 second)
+import numpy as np
+import pandas as pd
+
+def calculate_next_positions(df):
+    # Define constants
+    KNOTS_TO_METERS_PER_SEC = 0.514444
+    FEET_PER_MIN_TO_METERS_PER_SEC = 0.3048 / 60  # Conversion factor for ROCD
+
+    # Initialize new columns
+    df["lx"] = df["x"]  # Default to current x
+    df["ly"] = df["y"]  # Default to current y
+    df["lz"] = df["z"]  # Default to current z
+
+    for i in range(len(df) - 1):  # Loop through all except the last row
+        # Skip rows with NaN duration or speed
+        if pd.isna(df.loc[i, "duration_seconds"]) or df.loc[i, "SOG"] == 0:
+            continue
+
+        # Convert SOG to meters per second
+        speed = df.loc[i, "SOG"] * KNOTS_TO_METERS_PER_SEC
+
+        # Convert COG to radians
+        cog_radians = np.radians(df.loc[i, "COG"])
+
+        # Compute velocity components
+        vx = speed * np.cos(cog_radians)
+        vy = speed * np.sin(cog_radians)
+
+        # Compute vertical velocity if ROCD (Rate of Climb/Descent) is available
+        if "ROCD" in df.columns and not pd.isna(df.loc[i, "ROCD"]):
+            vz = df.loc[i, "ROCD"] * FEET_PER_MIN_TO_METERS_PER_SEC  # Convert ROCD to m/s
+        else:
+            vz = 0  # Assume no vertical movement if ROCD is missing
+
+        # Calculate next positions
+        df.loc[i + 1, "lx"] = df.loc[i, "x"] + vx * df.loc[i, "duration_seconds"]
+        df.loc[i + 1, "ly"] = df.loc[i, "y"] + vy * df.loc[i, "duration_seconds"]
+        df.loc[i + 1, "lz"] = df.loc[i, "z"] + vz * df.loc[i, "duration_seconds"]
+
+    return df
+
+
+=================================================================================================
+If you don't have the ROCD (Rate of Climb/Descent) column and are working with x, y, z converted from latitude and longitude, then z should be updated based on movement trends just like x and y.
+
+Since z is part of a 3D coordinate system, we assume movement in x, y, z follows the same direction and speed.
+
+Updated Approach
+Compute velocity components in 3D (vx, vy, vz):
+vx and vy remain the same.
+vz is calculated using the difference in z values between consecutive time steps.
+Use previous step's z change rate to predict lz.
+
+import numpy as np
+import pandas as pd
+
+def calculate_next_positions(df):
+    # Define constants
+    KNOTS_TO_METERS_PER_SEC = 0.514444
+
+    # Initialize new columns
+    df["lx"] = df["x"]  # Default to current x
+    df["ly"] = df["y"]  # Default to current y
+    df["lz"] = df["z"]  # Default to current z
+
+    for i in range(len(df) - 1):  # Loop through all except the last row
+        # Skip rows with NaN duration or speed
+        if pd.isna(df.loc[i, "duration_seconds"]) or df.loc[i, "SOG"] == 0:
+            continue
+
+        # Convert SOG to meters per second
+        speed = df.loc[i, "SOG"] * KNOTS_TO_METERS_PER_SEC
+
+        # Convert COG to radians
+        cog_radians = np.radians(df.loc[i, "COG"])
+
+        # Compute velocity components in x and y
+        vx = speed * np.cos(cog_radians)
+        vy = speed * np.sin(cog_radians)
+
+        # Compute vz (vertical velocity) based on z difference in previous steps
+        if i > 0:  # Ensure we don't access negative index
+            prev_z_diff = df.loc[i, "z"] - df.loc[i - 1, "z"]
+            vz = prev_z_diff / df.loc[i, "duration_seconds"]  # Change in z per second
+        else:
+            vz = 0  # Assume no vertical movement at start
+
+        # Calculate next positions
+        df.loc[i + 1, "lx"] = df.loc[i, "x"] + vx * df.loc[i, "duration_seconds"]
+        df.loc[i + 1, "ly"] = df.loc[i, "y"] + vy * df.loc[i, "duration_seconds"]
+        df.loc[i + 1, "lz"] = df.loc[i, "z"] + vz * df.loc[i, "duration_seconds"]  # Update lz
+
+    return df
+Key Updates
+✅ Estimates z movement dynamically
+✅ Uses previous z changes to determine altitude trend
+✅ Works even if z remains constant
+
+This will predict lx, ly, lz more accurately in 3D space. 🚀 Let me know if you need refinements!
