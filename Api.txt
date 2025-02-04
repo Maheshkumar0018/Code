@@ -1,108 +1,104 @@
-import numpy as np
-import pandas as pd
+import tensorflow as tf
+from tensorflow.keras.layers import (
+    Input, LSTM, Dense, Concatenate, Dropout, MultiHeadAttention,
+    Add, LayerNormalization, RepeatVector, Lambda, Conv1D, Bidirectional, Reshape
+)
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
 
-def calculate_next_positions(df):
-    # Define constants
-    KNOTS_TO_METERS_PER_SEC = 0.514444
-    FEET_PER_MIN_TO_METERS_PER_SEC = 0.3048 / 60  # Conversion factor for ROCD
+def create_advanced_probabilistic_seq2seq(input_seq_len, output_seq_len, input_dim, output_dim, latent_dim):
+    """
+    Enhanced Probabilistic Seq2Seq Model for Time Series Forecasting with improvements for handling time series data.
+    """
+    # Encoder
+    encoder_inputs = Input(shape=(input_seq_len, input_dim), name="encoder_inputs")
 
-    # Initialize new columns
-    df["lx"] = df["x"]  # Default to current x
-    df["ly"] = df["y"]  # Default to current y
-    df["lz"] = df["z"]  # Default to current z
+    # Temporal Convolutional Layer
+    encoder_conv = Conv1D(filters=64, kernel_size=3, activation='relu', padding='same', name="encoder_conv")(encoder_inputs)
+    encoder_conv = Dropout(0.3, name="encoder_conv_dropout")(encoder_conv)
 
-    for i in range(len(df) - 1):  # Loop through all except the last row
-        # Skip rows with NaN duration or speed
-        if pd.isna(df.loc[i, "duration_seconds"]) or df.loc[i, "SOG"] == 0:
-            continue
+    # Bidirectional LSTM
+    encoder_lstm = Bidirectional(LSTM(latent_dim, return_sequences=True, return_state=True, name="encoder_lstm"))
+    encoder_outputs, forward_h, forward_c, backward_h, backward_c = encoder_lstm(encoder_conv)
 
-        # Convert SOG to meters per second
-        speed = df.loc[i, "SOG"] * KNOTS_TO_METERS_PER_SEC
+    # Combine forward and backward states
+    state_h = Concatenate()([forward_h, backward_h])
+    state_c = Concatenate()([forward_c, backward_c])
 
-        # Convert COG to radians
-        cog_radians = np.radians(df.loc[i, "COG"])
+    # Multi-Head Attention for Encoder
+    multi_head_attention = MultiHeadAttention(num_heads=4, key_dim=latent_dim, name="multi_head_attention")
+    encoder_attention = multi_head_attention(encoder_outputs, encoder_outputs)
+    encoder_attention = LayerNormalization(name="encoder_attention_norm")(encoder_attention)
 
-        # Compute velocity components
-        vx = speed * np.cos(cog_radians)
-        vy = speed * np.sin(cog_radians)
+    # Decoder
+    decoder_inputs = Input(shape=(output_seq_len, input_dim), name="decoder_inputs")
 
-        # Compute vertical velocity if ROCD (Rate of Climb/Descent) is available
-        if "ROCD" in df.columns and not pd.isna(df.loc[i, "ROCD"]):
-            vz = df.loc[i, "ROCD"] * FEET_PER_MIN_TO_METERS_PER_SEC  # Convert ROCD to m/s
-        else:
-            vz = 0  # Assume no vertical movement if ROCD is missing
+    # Convolutional Layer in Decoder
+    decoder_conv = Conv1D(filters=64, kernel_size=3, activation='relu', padding='same', name="decoder_conv")(decoder_inputs)
+    decoder_conv = Dropout(0.3, name="decoder_conv_dropout")(decoder_conv)
 
-        # Calculate next positions
-        df.loc[i + 1, "lx"] = df.loc[i, "x"] + vx * df.loc[i, "duration_seconds"]
-        df.loc[i + 1, "ly"] = df.loc[i, "y"] + vy * df.loc[i, "duration_seconds"]
-        df.loc[i + 1, "lz"] = df.loc[i, "z"] + vz * df.loc[i, "duration_seconds"]
+    # Decoder LSTM
+    decoder_lstm = LSTM(latent_dim * 2, return_sequences=True, return_state=True, name="decoder_lstm")
+    decoder_outputs, _, _ = decoder_lstm(decoder_conv, initial_state=[state_h, state_c])
 
-    return df
+    # Multi-Head Attention in Decoder (Using Encoder Outputs)
+    attention_context = multi_head_attention(decoder_outputs, encoder_outputs)  
+    attention_context = LayerNormalization(name="decoder_attention_norm")(attention_context)
 
+    # Summarize Attention
+    attention_context = Lambda(lambda x: tf.reduce_mean(x, axis=1), name="summarize_attention")(attention_context)
+    attention_context_repeated = RepeatVector(output_seq_len)(attention_context)
+    attention_context_repeated = Reshape((output_seq_len, latent_dim * 2))(attention_context_repeated)
 
-=================================================================================================
-If you don't have the ROCD (Rate of Climb/Descent) column and are working with x, y, z converted from latitude and longitude, then z should be updated based on movement trends just like x and y.
+    # Merge Attention Context with Decoder Outputs
+    merged_context = Concatenate(axis=-1)([decoder_outputs, attention_context_repeated])
 
-Since z is part of a 3D coordinate system, we assume movement in x, y, z follows the same direction and speed.
+    # Dropout & Output Layers
+    dropout = Dropout(0.4, name="decoder_dropout")(merged_context)
+    
+    # **Fix: Use Exponential Activation Instead of Softplus**
+    output_mean = Dense(output_dim, activation="linear", kernel_regularizer=tf.keras.regularizers.l2(1e-4),
+                        name="mean_output")(dropout)
+    output_std = Dense(output_dim, activation="exponential", kernel_regularizer=tf.keras.regularizers.l2(1e-4),
+                       name="std_output")(dropout)
 
-Updated Approach
-Compute velocity components in 3D (vx, vy, vz):
-vx and vy remain the same.
-vz is calculated using the difference in z values between consecutive time steps.
-Use previous step's z change rate to predict lz.
+    # Combine Outputs
+    outputs = Concatenate(name="probabilistic_outputs")([output_mean, output_std])
 
-import numpy as np
-import pandas as pd
+    # Define Model
+    model = Model(inputs=[encoder_inputs, decoder_inputs], outputs=outputs, name="enhanced_probabilistic_seq2seq_model")
 
-def calculate_next_positions(df):
-    # Define constants
-    KNOTS_TO_METERS_PER_SEC = 0.514444
+    # **Custom Loss Function (Negative Log-Likelihood)**
+    def nll_loss(y_true, y_pred):
+        mean = y_pred[..., :output_dim]
+        std = y_pred[..., output_dim:] + 1e-6  # **Fix: Add epsilon to avoid division by zero**
+        dist = tf.compat.v1.distributions.Normal(loc=mean, scale=std)
+        return -tf.reduce_mean(dist.log_prob(y_true))
 
-    # Initialize new columns
-    df["lx"] = df["x"]  # Default to current x
-    df["ly"] = df["y"]  # Default to current y
-    df["lz"] = df["z"]  # Default to current z
+    # **CRPS Metric**
+    def crps_metric(y_true, y_pred):
+        mean = y_pred[..., :output_dim]
+        std = y_pred[..., output_dim:] + 1e-6  # **Fix: Add epsilon**
+        return tf.reduce_mean((y_true - mean) ** 2 / (2 * std ** 2) + tf.math.log(std))
 
-    for i in range(len(df) - 1):  # Loop through all except the last row
-        # Skip rows with NaN duration or speed
-        if pd.isna(df.loc[i, "duration_seconds"]) or df.loc[i, "SOG"] == 0:
-            continue
+    # **Adjusted R² Metric**
+    def adjusted_r2_score(y_true, y_pred):
+        mean = y_pred[..., :output_dim]
+        ss_res = tf.reduce_sum(tf.square(y_true - mean), axis=-1)
+        ss_tot = tf.reduce_sum(tf.square(y_true - tf.reduce_mean(y_true, axis=-1, keepdims=True)), axis=-1)
+        
+        r2 = 1 - (ss_res / (ss_tot + tf.keras.backend.epsilon()))  # **Fix: Avoid zero denominator**
+        
+        n = tf.cast(tf.shape(y_true)[0], tf.float32)
+        p = tf.cast(output_dim, tf.float32)
+        
+        adjusted_r2 = 1 - ((1 - r2) * (n - 1)) / (n - p - 1 + tf.keras.backend.epsilon())  # **Fix: Avoid division by zero**
+        return adjusted_r2
 
-        # Convert SOG to meters per second
-        speed = df.loc[i, "SOG"] * KNOTS_TO_METERS_PER_SEC
+    # **Optimizer with Gradient Clipping**
+    optimizer = Adam(learning_rate=0.001, clipnorm=1.0)  # **Fix: Lower learning rate & add clipnorm**
 
-        # Convert COG to radians
-        cog_radians = np.radians(df.loc[i, "COG"])
+    # Compile Model
+    model.compile(optimizer=optimizer, loss=nll_loss, metrics=[crps_metric, adjusted_r2_score])
 
-        # Compute velocity components in x and y
-        vx = speed * np.cos(cog_radians)
-        vy = speed * np.sin(cog_radians)
-
-        # Compute vz (vertical velocity) based on z difference in previous steps
-        if i > 0:  # Ensure we don't access negative index
-            prev_z_diff = df.loc[i, "z"] - df.loc[i - 1, "z"]
-            vz = prev_z_diff / df.loc[i, "duration_seconds"]  # Change in z per second
-        else:
-            vz = 0  # Assume no vertical movement at start
-
-        # Calculate next positions
-        df.loc[i + 1, "lx"] = df.loc[i, "x"] + vx * df.loc[i, "duration_seconds"]
-        df.loc[i + 1, "ly"] = df.loc[i, "y"] + vy * df.loc[i, "duration_seconds"]
-        df.loc[i + 1, "lz"] = df.loc[i, "z"] + vz * df.loc[i, "duration_seconds"]  # Update lz
-
-    return df
-Key Updates
-✅ Estimates z movement dynamically
-✅ Uses previous z changes to determine altitude trend
-✅ Works even if z remains constant
-
-This will predict lx, ly, lz more accurately in 3D space. 🚀 Let me know if you need refinements!
-
-===========================================================================
-def nll_loss(y_true, y_pred):
-    mean = y_pred[..., :output_dim]
-    std = y_pred[..., output_dim:]
-    std = tf.keras.backend.maximum(std, tf.keras.backend.epsilon())  # Ensure std > 0
-    dist = tfp.distributions.Normal(loc=mean, scale=std)
-    return -tf.reduce_mean(dist.log_prob(y_true))
-import tensorflow_probability as tfp
+    return model
