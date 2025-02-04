@@ -1,31 +1,20 @@
-import os
+1. Numerical Instability in Standard Deviation (std_output)
+The std_output is passed through a softplus activation to ensure positivity, but it can still become very small (close to zero). If the standard deviation becomes too small, the normal distribution log-probability calculation (log_prob) in the nll_loss function can cause numerical instability, leading to NaN.
+Add a small epsilon to the standard deviation to prevent division by zero:
+std = y_pred[..., output_dim:] + 1e-6  # Adding a small epsilon
+Try using exponential activation (exp) instead of softplus
+output_std = Dense(output_dim, activation="exponential", kernel_regularizer=tf.keras.regularizers.l2(1e-4),
+                   name="std_output")(dropout)
 
-path = 'runs/train/yolo/weights/file.onnx'
+Division by Zero in Adjusted R² Calculation
+The adjusted R² formula divides by (n - p - 1), which can lead to NaN if n <= p + 1.
+If ss_tot is zero (when all y_true values are the same), the denominator in the R² calculation becomes zero, leading to NaN
 
-filename = os.path.basename(path)
-directory = os.path.dirname(path)
+Add epsilon in the denominator
+r2 = 1 - (ss_res / (ss_tot + tf.keras.backend.epsilon()))
+adjusted_r2 = 1 - ((1 - r2) * (n - 1)) / (n - p - 1 + tf.keras.backend.epsilon())
 
-print("Filename:", filename)
-print("Directory:", directory)
-
-
-path = 'folder/folder/folder/folder/file'
-
-# Split the path into components
-path_components = path.split('/')
-
-# Print the components
-print("Path Components:", path_components)
-
-
-path_components = ['folder', 'folder', 'folder', 'folder', 'file']
-
-# Join the path components using '/'
-reconstructed_path = '/'.join(path_components)
-
-print("Reconstructed Path:", reconstructed_path)
-
-# Reconstruct the path using os.path.join
-reconstructed_path = os.path.join(*path_components)
-
-print("Reconstructed Path:", reconstructed_path)
+Exploding Gradients Due to High Learning Rate
+You're using a learning rate of 0.01, which might be too high for LSTMs.
+Large gradients can make std_output grow excessively, leading to instability.
+optimizer = Adam(learning_rate=0.001, clipnorm=1.0)  # Limit gradient magnitude
